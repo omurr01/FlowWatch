@@ -1,0 +1,30 @@
+# --- Secrets ---
+.env
+
+# --- Mosquitto generated files ---
+mosquitto/config/passwd
+mosquitto/certs/*.key
+mosquitto/certs/*.crt
+mosquitto/certs/*.csr
+mosquitto/certs/*.srl
+
+# --- Docker data (managed by volumes, not committed) ---
+mosquitto/data/
+mosquitto/log/
+
+# --- Python ---
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# --- Node ---
+node_modules/
+dist/
+build/
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo

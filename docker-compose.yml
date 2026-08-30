@@ -1,0 +1,114 @@
+# FlowWatch — Docker Compose (Sprint 0)
+# ARCHITECTURE.md §3: all cloud services on a single VPS / dev machine
+# Run setup.ps1 FIRST to generate the Mosquitto password file.
+
+services:
+
+  # ── MQTT Broker ──────────────────────────────────────────────────────────
+  # ARCHITECTURE.md §1: transport between device, dashboard, and Node-RED
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: flowwatch-mosquitto
+    ports:
+      - "1883:1883"   # Plain MQTT (local dev — disable in production)
+      - "9001:9001"   # WebSocket (dashboard connects here)
+    volumes:
+      - ./mosquitto/config:/mosquitto/config:ro
+      - ./mosquitto/certs:/mosquitto/certs:ro
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+    restart: unless-stopped
+    networks:
+      - flowwatch
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_sub -t '$$SYS/broker/uptime' -C 1 -u health -W 3 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ── Data Router ──────────────────────────────────────────────────────────
+  # ARCHITECTURE.md §1: routes MQTT → InfluxDB/MySQL, exposes HTTP endpoints
+  nodered:
+    image: nodered/node-red:latest
+    container_name: flowwatch-nodered
+    ports:
+      - "1880:1880"
+    volumes:
+      - nodered_data:/data
+    environment:
+      - TZ=UTC
+    depends_on:
+      mosquitto:
+        condition: service_started
+      influxdb:
+        condition: service_started
+      mysql:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - flowwatch
+
+  # ── Time-Series Store ────────────────────────────────────────────────────
+  # SCHEMA.md §2: sensor readings (ultrasonic, waterlevel)
+  influxdb:
+    image: influxdb:2
+    container_name: flowwatch-influxdb
+    ports:
+      - "8086:8086"
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+      - influxdb_config:/etc/influxdb2
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=${INFLUXDB_USERNAME}
+      - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUXDB_PASSWORD}
+      - DOCKER_INFLUXDB_INIT_ORG=${INFLUXDB_ORG}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUXDB_BUCKET}
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUXDB_ADMIN_TOKEN}
+    restart: unless-stopped
+    networks:
+      - flowwatch
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ── Event Store ──────────────────────────────────────────────────────────
+  # SCHEMA.md §3: discrete events (blockage_detected, cycle_complete, etc.)
+  mysql:
+    image: mysql:8
+    container_name: flowwatch-mysql
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql/init:/docker-entrypoint-initdb.d:ro
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+    restart: unless-stopped
+    networks:
+      - flowwatch
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  mosquitto_data:
+  mosquitto_log:
+  nodered_data:
+  influxdb_data:
+  influxdb_config:
+  mysql_data:
+
+networks:
+  flowwatch:
+    driver: bridge
