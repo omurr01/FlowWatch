@@ -23,6 +23,9 @@ node_modules/
 dist/
 build/
 
+# --- Node-RED generated data ---
+nodered/data/.npm/
+
 # --- IDE ---
 .vscode/
 .idea/

@@ -1,0 +1,10 @@
+{
+    "name": "node-red-project",
+    "description": "FlowWatch Node-RED project — Sprint 1 data pipeline (MQTT -> InfluxDB/MySQL + HTTP history API)",
+    "version": "0.1.0",
+    "private": true,
+    "dependencies": {
+        "node-red-contrib-influxdb": "^0.7.0",
+        "node-red-node-mysql": "^3.0.3"
+    }
+}

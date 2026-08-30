@@ -17,11 +17,13 @@ services:
       - ./mosquitto/certs:/mosquitto/certs:ro
       - mosquitto_data:/mosquitto/data
       - mosquitto_log:/mosquitto/log
+    environment:
+      MQTT_HEALTH_PASSWORD: ${MQTT_HEALTH_PASSWORD}
     restart: unless-stopped
     networks:
       - flowwatch
     healthcheck:
-      test: ["CMD-SHELL", "mosquitto_sub -t '$$SYS/broker/uptime' -C 1 -u health -W 3 || exit 1"]
+      test: ["CMD-SHELL", "mosquitto_sub -t '$$SYS/broker/uptime' -C 1 -u health -P $${MQTT_HEALTH_PASSWORD} -W 3 || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -35,16 +37,29 @@ services:
     ports:
       - "1880:1880"
     volumes:
-      - nodered_data:/data
+      - ./nodered/data:/data
     environment:
       - TZ=UTC
+      # Credentials injected into node configs via ${VAR} (kept out of commits)
+      - MQTT_HOST=mosquitto
+      - MQTT_PORT=1883
+      - MQTT_NODERED_USERNAME=nodered
+      - MQTT_NODERED_PASSWORD=${MQTT_NODERED_PASSWORD}
+      - INFLUXDB_URL=http://influxdb:8086
+      - INFLUXDB_ORG=${INFLUXDB_ORG}
+      - INFLUXDB_ADMIN_TOKEN=${INFLUXDB_ADMIN_TOKEN}
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
     depends_on:
       mosquitto:
         condition: service_started
       influxdb:
-        condition: service_started
+        condition: service_healthy
       mysql:
-        condition: service_started
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - flowwatch
@@ -104,7 +119,6 @@ services:
 volumes:
   mosquitto_data:
   mosquitto_log:
-  nodered_data:
   influxdb_data:
   influxdb_config:
   mysql_data:

@@ -1,4 +1,4 @@
-# =============================================================================
+﻿# =============================================================================
 # FlowWatch — Sprint 0 Environment Setup (PowerShell)
 # Run this ONCE before 'docker compose up -d'.
 #
@@ -50,12 +50,13 @@ if (!(Test-Path $passwdDir)) {
 # Start with empty file
 Set-Content -Path $passwdFile -Value "" -NoNewline
 
-# ARCHITECTURE.md section 4: four credential scopes
+# ARCHITECTURE.md section 4: four credential scopes + internal health-check user
 $users = @(
     @{ Name = "device_unit1"; PasswordKey = "MQTT_DEVICE_UNIT1_PASSWORD" },
     @{ Name = "device_unit2"; PasswordKey = "MQTT_DEVICE_UNIT2_PASSWORD" },
     @{ Name = "dashboard";    PasswordKey = "MQTT_DASHBOARD_PASSWORD" },
-    @{ Name = "nodered";      PasswordKey = "MQTT_NODERED_PASSWORD" }
+    @{ Name = "nodered";      PasswordKey = "MQTT_NODERED_PASSWORD" },
+    @{ Name = "health";       PasswordKey = "MQTT_HEALTH_PASSWORD" }
 )
 
 foreach ($user in $users) {
@@ -65,10 +66,17 @@ foreach ($user in $users) {
         exit 1
     }
 
-    # Use temporary mosquitto container to hash passwords
+    # Use temporary mosquitto container to hash passwords.
+    # In PowerShell 5.1, a native command's stderr is surfaced as an error record, so
+    # under $ErrorActionPreference="Stop" the container's benign warnings (e.g. "world
+    # readable permissions") become terminating errors that abort the loop mid-way.
+    # Scope ErrorActionPreference to "Continue" for the call and rely on $LASTEXITCODE.
     $mountPath = (Resolve-Path $passwdDir).Path -replace '\\', '/'
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
     docker run --rm -v "${mountPath}:/mosquitto/config" eclipse-mosquitto:2 `
         mosquitto_passwd -b /mosquitto/config/passwd $user.Name $password 2>$null
+    $ErrorActionPreference = $prevEap
 
     if ($LASTEXITCODE -ne 0) {
         Write-Host "  [ERROR] Failed to add user $($user.Name)" -ForegroundColor Red

@@ -1,0 +1,337 @@
+[
+    {
+        "id": "tab-pipeline",
+        "type": "tab",
+        "label": "FlowWatch Pipeline",
+        "disabled": false,
+        "info": "Sprint 1 Data Pipeline (SCHEMA.md 2/3). Routes MQTT sensor readings to InfluxDB and events to MySQL, and exposes read-only HTTP history endpoints (ARCHITECTURE.md 1)."
+    },
+    {
+        "id": "broker1",
+        "type": "mqtt-broker",
+        "name": "Mosquitto",
+        "broker": "mosquitto",
+        "port": "1883",
+        "clientid": "nodered-pipeline",
+        "autoConnect": true,
+        "usetls": false,
+        "compatmode": true,
+        "protocolVersion": "4",
+        "keepalive": "60",
+        "cleansession": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthRetain": "false",
+        "birthPayload": "",
+        "closeTopic": "",
+        "closeQos": "0",
+        "closeRetain": "false",
+        "closePayload": "",
+        "willTopic": "",
+        "willQos": "0",
+        "willRetain": "false",
+        "willPayload": "",
+        "username": "${MQTT_NODERED_USERNAME}",
+        "password": "${MQTT_NODERED_PASSWORD}"
+    },
+    {
+        "id": "influx1",
+        "type": "influxdb",
+        "name": "InfluxDB v2",
+        "hostname": "influxdb",
+        "port": "8086",
+        "protocol": "http",
+        "database": "flowwatch",
+        "usetls": false,
+        "tls": "",
+        "influxdbVersion": "2.0",
+        "url": "${INFLUXDB_URL}",
+        "timeout": 10,
+        "rejectUnauthorized": true
+    },
+    {
+        "id": "mysql1",
+        "type": "MySQLdatabase",
+        "name": "MySQL flowwatch",
+        "host": "mysql",
+        "port": "3306",
+        "db": "${MYSQL_DATABASE}",
+        "tz": "UTC",
+        "charset": "UTF8",
+        "user": "${MYSQL_USER}",
+        "password": "${MYSQL_PASSWORD}"
+    },
+    {
+        "id": "mqtt-sensors",
+        "type": "mqtt in",
+        "z": "tab-pipeline",
+        "name": "MQTT sensors",
+        "topic": "flowwatch/+/sensor/#",
+        "qos": "1",
+        "datatype": "json",
+        "broker": "broker1",
+        "x": 180,
+        "y": 120,
+        "wires": [
+            [
+                "split-sensor"
+            ]
+        ]
+    },
+    {
+        "id": "split-sensor",
+        "type": "function",
+        "z": "tab-pipeline",
+        "name": "Split sensor into Influx point (SCHEMA 2)",
+        "func": "// SCHEMA.md 1: flowwatch/{unit}/sensor/{name}  parse unit + measurement\nconst path = msg.topic.split('/');\nconst unit = path[1];\nconst name = path[3];\nconst body = msg.payload || {};\n\n// SCHEMA.md 2: measurement name + tag unit_id; payload [fields, tags]\nmsg.measurement = name; // 'ultrasonic' | 'waterlevel'\nmsg.payload = name === 'ultrasonic'\n    ? [{ distance_cm: body.cm }, { unit_id: unit }]\n    : [{ level_cm: body.cm }, { unit_id: unit }];\nreturn msg;",
+        "outputs": 1,
+        "x": 380,
+        "y": 120,
+        "wires": [
+            [
+                "influx-write"
+            ]
+        ]
+    },
+    {
+        "id": "influx-write",
+        "type": "influxdb out",
+        "z": "tab-pipeline",
+        "name": "Write readings",
+        "influxdb": "influx1",
+        "measurement": "",
+        "precision": "",
+        "retentionPolicy": "",
+        "database": "flowwatch",
+        "precisionV18FluxV20": "ns",
+        "retentionPolicyV18Flux": "",
+        "org": "flowwatch",
+        "bucket": "flowwatch_unit1",
+        "x": 600,
+        "y": 120,
+        "wires": []
+    },
+    {
+        "id": "mqtt-alerts",
+        "type": "mqtt in",
+        "z": "tab-pipeline",
+        "name": "MQTT alerts",
+        "topic": "flowwatch/+/alert/#",
+        "qos": "1",
+        "datatype": "json",
+        "broker": "broker1",
+        "x": 180,
+        "y": 220,
+        "wires": [
+            [
+                "map-alert-event"
+            ]
+        ]
+    },
+    {
+        "id": "map-alert-event",
+        "type": "function",
+        "z": "tab-pipeline",
+        "name": "Map alert to event row (SCHEMA 4)",
+        "func": "// SCHEMA.md 1: flowwatch/{unit}/alert/{kind}\nconst path = msg.topic.split('/');\nconst unit = path[1];\nconst kind = path[3];\nconst b = msg.payload || {};\n\n// SCHEMA.md 4: alert topic -> event_type + detail\nlet event_type, detail;\nswitch (kind) {\n    case 'blockage':\n        event_type = 'blockage_detected';\n        detail = 'distance_cm=' + b.distance_cm;\n        break;\n    case 'flood':\n        event_type = 'flood_alert';\n        detail = 'level_cm=' + b.level_cm;\n        break;\n    case 'fault':\n        event_type = 'fault';\n        detail = b.code; // SCHEMA.md 4 fault code\n        break;\n    default:\n        event_type = kind;\n        detail = JSON.stringify(b);\n}\n\nmsg.topic = 'INSERT INTO events (unit_id, event_type, detail) VALUES (?, ?, ?);';\nmsg.payload = [unit, event_type, detail];\nreturn msg;",
+        "outputs": 1,
+        "x": 380,
+        "y": 220,
+        "wires": [
+            [
+                "mysql-insert"
+            ]
+        ]
+    },
+    {
+        "id": "mqtt-control",
+        "type": "mqtt in",
+        "z": "tab-pipeline",
+        "name": "MQTT control",
+        "topic": "flowwatch/+/control/#",
+        "qos": "1",
+        "datatype": "json",
+        "broker": "broker1",
+        "x": 180,
+        "y": 300,
+        "wires": [
+            [
+                "map-control-event"
+            ]
+        ]
+    },
+    {
+        "id": "map-control-event",
+        "type": "function",
+        "z": "tab-pipeline",
+        "name": "Map control to event row (SCHEMA 4)",
+        "func": "// SCHEMA.md 1: flowwatch/{unit}/control/override\nconst path = msg.topic.split('/');\nconst unit = path[1];\nconst b = msg.payload || {};\n\n// SCHEMA.md 4: remote override logged as an event\nmsg.topic = 'INSERT INTO events (unit_id, event_type, detail) VALUES (?, ?, ?);';\nmsg.payload = [unit, 'manual_override_triggered', 'requested_by=' + (b.requested_by || 'unknown')];\nreturn msg;",
+        "outputs": 1,
+        "x": 380,
+        "y": 300,
+        "wires": [
+            [
+                "mysql-insert"
+            ]
+        ]
+    },
+    {
+        "id": "mysql-insert",
+        "type": "mysql",
+        "z": "tab-pipeline",
+        "name": "Insert event",
+        "mydb": "mysql1",
+        "x": 600,
+        "y": 260,
+        "wires": []
+    },
+    {
+        "id": "http-readings",
+        "type": "http in",
+        "z": "tab-pipeline",
+        "name": "GET /api/readings",
+        "url": "/api/readings",
+        "method": "get",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 180,
+        "y": 420,
+        "wires": [
+            [
+                "build-influx-query"
+            ]
+        ]
+    },
+    {
+        "id": "build-influx-query",
+        "type": "function",
+        "z": "tab-pipeline",
+        "name": "Build Influx Flux query",
+        "func": "// ARCHITECTURE.md 1: read-only history endpoint\nconst q = msg.req.query || {};\nconst unit = q.unit || 'unit1';\nconst measurement = q.measurement || 'waterlevel'; // SCHEMA.md 2\nconst field = measurement === 'ultrasonic' ? 'distance_cm' : 'level_cm';\nconst limit = Math.min(parseInt(q.limit) || 100, 1000);\n\nconst bucket = 'flowwatch_' + unit; // SCHEMA.md 2: one bucket per unit\n\nmsg.query = [\n    'from(bucket: \"' + bucket + '\")',\n    '  |> range(start: -24h)',\n    '  |> filter(fn: (r) => r._measurement == \"' + measurement + '\")',\n    '  |> filter(fn: (r) => r._field == \"' + field + '\")',\n    '  |> sort(columns: [\"_time\"])' + '  |> limit(n: ' + limit + ')'\n].join('\\n');\nreturn msg;",
+        "outputs": 1,
+        "x": 400,
+        "y": 420,
+        "wires": [
+            [
+                "influx-query"
+            ]
+        ]
+    },
+    {
+        "id": "influx-query",
+        "type": "influxdb in",
+        "z": "tab-pipeline",
+        "name": "Query InfluxDB",
+        "influxdb": "influx1",
+        "query": "",
+        "rawOutput": false,
+        "precision": "",
+        "retentionPolicy": "",
+        "org": "flowwatch",
+        "x": 620,
+        "y": 420,
+        "wires": [
+            [
+                "format-readings"
+            ]
+        ]
+    },
+    {
+        "id": "format-readings",
+        "type": "function",
+        "z": "tab-pipeline",
+        "name": "Format readings",
+        "func": "const rows = msg.payload || [];\nmsg.payload = rows.map(function (r) {\n    return { ts: r._time, value: r._value, unit_id: r.unit_id || 'unit1' };\n});\nmsg.headers = { 'Content-Type': 'application/json' };\nreturn msg;",
+        "outputs": 1,
+        "x": 820,
+        "y": 420,
+        "wires": [
+            [
+                "http-readings-out"
+            ]
+        ]
+    },
+    {
+        "id": "http-readings-out",
+        "type": "http response",
+        "z": "tab-pipeline",
+        "name": "Respond readings",
+        "statusCode": "",
+        "headers": {},
+        "x": 1000,
+        "y": 420,
+        "wires": []
+    },
+    {
+        "id": "http-events",
+        "type": "http in",
+        "z": "tab-pipeline",
+        "name": "GET /api/events",
+        "url": "/api/events",
+        "method": "get",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 180,
+        "y": 520,
+        "wires": [
+            [
+                "build-events-query"
+            ]
+        ]
+    },
+    {
+        "id": "build-events-query",
+        "type": "function",
+        "z": "tab-pipeline",
+        "name": "Build MySQL query",
+        "func": "const q = msg.req.query || {};\nconst unit = q.unit || null;\nconst limit = Math.min(parseInt(q.limit) || 50, 500);\n\n// SCHEMA.md 3: events table; optional per-unit filter\nlet sql = 'SELECT id, unit_id, event_type, detail, created_at FROM events';\nlet params = [];\nif (unit) { sql += ' WHERE unit_id = ?'; params.push(unit); }\nsql += ' ORDER BY created_at DESC LIMIT ?';\nparams.push(limit);\n\nmsg.topic = sql;\nmsg.payload = params;\nreturn msg;",
+        "outputs": 1,
+        "x": 400,
+        "y": 520,
+        "wires": [
+            [
+                "mysql-query"
+            ]
+        ]
+    },
+    {
+        "id": "mysql-query",
+        "type": "mysql",
+        "z": "tab-pipeline",
+        "name": "Query MySQL",
+        "mydb": "mysql1",
+        "x": 620,
+        "y": 520,
+        "wires": [
+            [
+                "format-events"
+            ]
+        ]
+    },
+    {
+        "id": "format-events",
+        "type": "function",
+        "z": "tab-pipeline",
+        "name": "Format events",
+        "func": "msg.payload = msg.payload || [];\nmsg.headers = { 'Content-Type': 'application/json' };\nreturn msg;",
+        "outputs": 1,
+        "x": 820,
+        "y": 520,
+        "wires": [
+            [
+                "http-events-out"
+            ]
+        ]
+    },
+    {
+        "id": "http-events-out",
+        "type": "http response",
+        "z": "tab-pipeline",
+        "name": "Respond events",
+        "statusCode": "",
+        "headers": {},
+        "x": 1000,
+        "y": 520,
+        "wires": []
+    }
+]
