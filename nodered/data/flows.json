@@ -4,7 +4,7 @@
         "type": "tab",
         "label": "FlowWatch Pipeline",
         "disabled": false,
-        "info": "Sprint 1 Data Pipeline (SCHEMA.md 2/3). Routes MQTT sensor readings to InfluxDB and events to MySQL, and exposes read-only HTTP history endpoints (ARCHITECTURE.md 1)."
+        "info": "Sprint 1 Data Pipeline (SCHEMA.md 2/3). Routes MQTT sensor readings to InfluxDB (per-unit bucket), alerts/status/control to MySQL events, and exposes read-only HTTP history endpoints (ARCHITECTURE.md 1)."
     },
     {
         "id": "broker1",
@@ -83,21 +83,60 @@
         "type": "function",
         "z": "tab-pipeline",
         "name": "Split sensor into Influx point (SCHEMA 2)",
-        "func": "// SCHEMA.md 1: flowwatch/{unit}/sensor/{name}  parse unit + measurement\nconst path = msg.topic.split('/');\nconst unit = path[1];\nconst name = path[3];\nconst body = msg.payload || {};\n\n// SCHEMA.md 2: measurement name + tag unit_id; payload [fields, tags]\nmsg.measurement = name; // 'ultrasonic' | 'waterlevel'\nmsg.payload = name === 'ultrasonic'\n    ? [{ distance_cm: body.cm }, { unit_id: unit }]\n    : [{ level_cm: body.cm }, { unit_id: unit }];\nreturn msg;",
+        "func": "// SCHEMA.md 1: flowwatch/{unit}/sensor/{name}  parse unit + measurement\nconst path = msg.topic.split('/');\nconst unit = path[1];\nconst name = path[3];\nconst body = msg.payload || {};\n\n// SCHEMA.md 2: measurement name + tag unit_id; payload [fields, tags]\nmsg.measurement = name; // 'ultrasonic' | 'waterlevel'\nmsg.payload = name === 'ultrasonic'\n    ? [{ distance_cm: body.cm }, { unit_id: unit }]\n    : [{ level_cm: body.cm }, { unit_id: unit }];\n// SCHEMA.md 2: one bucket per unit, chosen per unit from the topic\nmsg.bucket = 'flowwatch_' + unit;\nreturn msg;",
         "outputs": 1,
         "x": 380,
         "y": 120,
         "wires": [
             [
-                "influx-write"
+                "route-sensor-bucket"
             ]
         ]
     },
     {
-        "id": "influx-write",
+        "id": "route-sensor-bucket",
+        "type": "switch",
+        "z": "tab-pipeline",
+        "name": "Route by unit bucket (SCHEMA 2)",
+        "property": "bucket",
+        "propertyType": "msg",
+        "rules": [
+            {
+                "t": "eq",
+                "v": "flowwatch_unit1",
+                "vt": "str"
+            },
+            {
+                "t": "eq",
+                "v": "flowwatch_unit2",
+                "vt": "str"
+            },
+            {
+                "t": "else"
+            }
+        ],
+        "checkall": "false",
+        "repair": false,
+        "outputs": 3,
+        "x": 600,
+        "y": 120,
+        "wires": [
+            [
+                "influx-write-unit1"
+            ],
+            [
+                "influx-write-unit2"
+            ],
+            [
+                "debug-unknown-unit"
+            ]
+        ]
+    },
+    {
+        "id": "influx-write-unit1",
         "type": "influxdb out",
         "z": "tab-pipeline",
-        "name": "Write readings",
+        "name": "Write unit1",
         "influxdb": "influx1",
         "measurement": "",
         "precision": "",
@@ -107,8 +146,42 @@
         "retentionPolicyV18Flux": "",
         "org": "flowwatch",
         "bucket": "flowwatch_unit1",
-        "x": 600,
-        "y": 120,
+        "x": 820,
+        "y": 100,
+        "wires": []
+    },
+    {
+        "id": "influx-write-unit2",
+        "type": "influxdb out",
+        "z": "tab-pipeline",
+        "name": "Write unit2",
+        "influxdb": "influx1",
+        "measurement": "",
+        "precision": "",
+        "retentionPolicy": "",
+        "database": "flowwatch",
+        "precisionV18FluxV20": "ns",
+        "retentionPolicyV18Flux": "",
+        "org": "flowwatch",
+        "bucket": "flowwatch_unit2",
+        "x": 820,
+        "y": 140,
+        "wires": []
+    },
+    {
+        "id": "debug-unknown-unit",
+        "type": "debug",
+        "z": "tab-pipeline",
+        "name": "Unknown unit",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 820,
+        "y": 180,
         "wires": []
     },
     {
@@ -169,6 +242,38 @@
         "outputs": 1,
         "x": 380,
         "y": 300,
+        "wires": [
+            [
+                "mysql-insert"
+            ]
+        ]
+    },
+    {
+        "id": "mqtt-status",
+        "type": "mqtt in",
+        "z": "tab-pipeline",
+        "name": "MQTT status",
+        "topic": "flowwatch/+/status/#",
+        "qos": "1",
+        "datatype": "json",
+        "broker": "broker1",
+        "x": 180,
+        "y": 380,
+        "wires": [
+            [
+                "map-status-event"
+            ]
+        ]
+    },
+    {
+        "id": "map-status-event",
+        "type": "function",
+        "z": "tab-pipeline",
+        "name": "Map status to event row (SCHEMA 4)",
+        "func": "// SCHEMA.md 1: flowwatch/{unit}/status/{kind}  (actuator | connectivity)\n// FR-8: discrete events with timestamps. Log only on state transitions.\nconst path = msg.topic.split('/');\nconst unit = path[1];\nconst kind = path[3];\nconst b = msg.payload || {};\n\nconst prev = context.get('status_' + unit) || {};\nlet event_type = null;\nlet detail = null;\n\nif (kind === 'actuator') {\n    // SCHEMA.md 4: cycle_complete = returned to STANDBY after a cycle ran\n    if (b.state === 'STANDBY' &&\n        ['LIFTING', 'FLIPPING', 'LOWERING'].indexOf(prev.actuator) !== -1) {\n        event_type = 'cycle_complete';\n        detail = 'state=STANDBY';\n    }\n    prev.actuator = b.state;\n} else if (kind === 'connectivity') {\n    // SCHEMA.md 4: wifi_lost / wifi_restored on wifi boolean transitions\n    if (b.wifi === false && prev.wifi === true) {\n        event_type = 'wifi_lost';\n        detail = 'wifi=false';\n    } else if (b.wifi === true && prev.wifi === false) {\n        event_type = 'wifi_restored';\n        detail = 'wifi=true';\n    }\n    prev.wifi = b.wifi;\n}\n\ncontext.set('status_' + unit, prev);\n\nif (!event_type) {\n    return null; // not a transition -- retained/Live same-state messages are ignored\n}\n\nmsg.topic = 'INSERT INTO events (unit_id, event_type, detail) VALUES (?, ?, ?);';\nmsg.payload = [unit, event_type, detail];\nreturn msg;",
+        "outputs": 1,
+        "x": 380,
+        "y": 380,
         "wires": [
             [
                 "mysql-insert"

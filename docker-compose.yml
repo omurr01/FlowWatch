@@ -58,6 +58,8 @@ services:
         condition: service_started
       influxdb:
         condition: service_healthy
+      influxdb-init:
+        condition: service_completed_successfully
       mysql:
         condition: service_healthy
     restart: unless-stopped
@@ -90,6 +92,27 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+
+  # ── One-shot: ensure per-unit buckets exist ─────────────────────────────
+  # SCHEMA.md §2: one bucket per unit (flowwatch_{unit_id}). influxdb:2's
+  # DOCKER_INFLUXDB_INIT_BUCKET creates only one bucket on a fresh volume and
+  # skips setup (incl. /docker-entrypoint-initdb.d) once the bolt file exists.
+  # This service guarantees flowwatch_unit2 exists idempotently, on fresh AND
+  # pre-existing volumes; Node-RED waits for it via depends_on.
+  influxdb-init:
+    image: influxdb:2
+    container_name: flowwatch-influxdb-init
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    environment:
+      INFLUXDB_ORG: ${INFLUXDB_ORG}
+      INFLUXDB_ADMIN_TOKEN: ${INFLUXDB_ADMIN_TOKEN}
+    command: |
+      /bin/sh -c 'if influx bucket list --org "$$INFLUXDB_ORG" --token "$$INFLUXDB_ADMIN_TOKEN" --host http://influxdb:8086 | grep -q flowwatch_unit2; then echo "flowwatch_unit2 bucket already exists"; else influx bucket create --org "$$INFLUXDB_ORG" --name flowwatch_unit2 --token "$$INFLUXDB_ADMIN_TOKEN" --host http://influxdb:8086; fi'
+    restart: "no"
+    networks:
+      - flowwatch
 
   # ── Event Store ──────────────────────────────────────────────────────────
   # SCHEMA.md §3: discrete events (blockage_detected, cycle_complete, etc.)
