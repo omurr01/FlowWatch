@@ -1,4 +1,4 @@
-# FlowWatch — Docker Compose (Sprint 0)
+# FlowWatch — Docker Compose (Sprint 2)
 # ARCHITECTURE.md §3: all cloud services on a single VPS / dev machine
 # Run setup.ps1 FIRST to generate the Mosquitto password file.
 
@@ -139,12 +139,40 @@ services:
       retries: 5
       start_period: 60s
 
+  # ── Dashboard (React/Vite) ───────────────────────────────────────────────
+  # Sprint 2: served by Vite preview on port 3000.
+  # ARCHITECTURE.md §3: dashboard static build served from VPS.
+  # In production replace with nginx serving the dist/ output.
+  dashboard:
+    image: node:20-alpine
+    container_name: flowwatch-dashboard
+    working_dir: /app
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./dashboard:/app
+      - dashboard_node_modules:/app/node_modules
+    environment:
+      # MQTT WebSocket — ARCHITECTURE.md §4 port 9001
+      # In production, change to wss://<VPS_HOSTNAME>:9001
+      - VITE_MQTT_WS_URL=ws://localhost:9001
+      - VITE_MQTT_USERNAME=dashboard
+      - VITE_MQTT_PASSWORD=${MQTT_DASHBOARD_PASSWORD}
+    command: sh -c "npm install && npm run build && npm run preview -- --host 0.0.0.0 --port 3000"
+    depends_on:
+      - mosquitto
+      - nodered
+    restart: unless-stopped
+    networks:
+      - flowwatch
+
 volumes:
   mosquitto_data:
   mosquitto_log:
   influxdb_data:
   influxdb_config:
   mysql_data:
+  dashboard_node_modules:
 
 networks:
   flowwatch:

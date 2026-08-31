@@ -1,0 +1,41 @@
+/* FlowWatch — global styles. DESIGN.md §1 tokens as CSS custom properties. */
+
+:root {
+  --bg:         #0B0F10;
+  --surface:    #12181A;
+  --border:     #223034;
+  --text:       #E7EEEC;
+  --text-muted: #7B928F;
+  --text-dim:   #5A6E6B;
+  --ok:         #5DCAA5;
+  --warn:       #EF9F27;
+  --danger:     #E24B4A;
+  --accent:     #378ADD;
+}
+
+/* Typography — DESIGN.md §1: system UI stack, tabular figures for numerics */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: Inter, 'Segoe UI', system-ui, sans-serif;
+  font-size:   16px;
+  line-height: 1.5;
+}
+
+body {
+  margin:     0;
+  background: var(--bg);
+  color:      var(--text);
+}
+
+/* Tabular numerics for live-updating values — DESIGN.md §1 */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Scrollbar tinting for dark theme */
+::-webkit-scrollbar        { width: 6px; height: 6px; }
+::-webkit-scrollbar-track  { background: var(--surface); }
+::-webkit-scrollbar-thumb  { background: var(--border); border-radius: 3px; }
