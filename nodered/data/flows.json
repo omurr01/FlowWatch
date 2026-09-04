@@ -238,7 +238,7 @@
         "type": "function",
         "z": "tab-pipeline",
         "name": "Map control to event row (SCHEMA 4)",
-        "func": "// SCHEMA.md 1: flowwatch/{unit}/control/override\nconst path = msg.topic.split('/');\nconst unit = path[1];\nconst b = msg.payload || {};\n\n// SCHEMA.md 4: remote override logged as an event\nmsg.topic = 'INSERT INTO events (unit_id, event_type, detail) VALUES (?, ?, ?);';\nmsg.payload = [unit, 'manual_override_triggered', 'requested_by=' + (b.requested_by || 'unknown')];\nreturn msg;",
+        "func": "// SCHEMA.md 1: flowwatch/{unit}/control/manual\nconst path = msg.topic.split('/');\nconst unit = path[1];\nconst b = msg.payload || {};\n\n// SCHEMA.md 4: manual mode activation/release logged as events\nconst event_type = b.action === 'release' ? 'manual_mode_released' : 'manual_mode_activated';\nmsg.topic = 'INSERT INTO events (unit_id, event_type, detail) VALUES (?, ?, ?);';\nmsg.payload = [unit, event_type, 'requested_by=' + (b.requested_by || 'unknown')];\nreturn msg;",
         "outputs": 1,
         "x": 380,
         "y": 300,

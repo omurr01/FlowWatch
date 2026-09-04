@@ -5,7 +5,7 @@
 
 ## 1. Problem
 
-Manual drainage clearing is reactive and hazardous — blockages cause localized flooding before anyone notices. FlowWatch detects blockage and flood risk in a drainage channel, clears debris automatically, and gives an operator live remote visibility plus manual override, without needing anyone on-site.
+Manual drainage clearing is reactive and hazardous — blockages cause localized flooding before anyone notices. FlowWatch detects blockage and flood risk in a drainage channel, clears debris automatically, and gives an operator live remote visibility plus manual mode control, without needing anyone on-site.
 
 ## 2. Users
 
@@ -24,7 +24,7 @@ Manual drainage clearing is reactive and hazardous — blockages cause localized
 | FR-3 | Automatically run a lift → flip → lower removal cycle on blockage detection | Must |
 | FR-4 | Display live and confirm removal visually via camera snapshot on cycle completion | Should |
 | FR-5 | Publish live sensor + state data to the cloud over MQTT | Must |
-| FR-6 | Accept a remote manual-override command to trigger a cycle on demand | Must |
+| FR-6 | Accept a remote manual-mode command to activate or release operator control, triggering a cycle on demand | Must |
 | FR-7 | Display live sensor data, actuator state, and connectivity status on a dashboard reachable from anywhere | Must |
 | FR-8 | Log discrete events (blockage detected, cycle complete, alerts, faults) with timestamps | Must |
 | FR-9 | Send an SMS alert via GSM when Wi-Fi/cloud connectivity is unavailable | Must |

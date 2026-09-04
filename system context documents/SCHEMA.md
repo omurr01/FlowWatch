@@ -16,7 +16,7 @@ Prefix pattern: `flowwatch/{unit_id}/{category}/{name}` — `unit_id` is `unit1`
 | `flowwatch/{unit}/alert/blockage` | device → cloud | 1 | no | `{ "distance_cm": float, "ts": iso8601 }` |
 | `flowwatch/{unit}/alert/flood` | device → cloud | 1 | no | `{ "level_cm": float, "ts": iso8601 }` |
 | `flowwatch/{unit}/alert/fault` | device → cloud | 1 | no | `{ "code": string, "detail": string, "ts": iso8601 }` — see §4 for fault codes |
-| `flowwatch/{unit}/control/override` | cloud → device | 1 | no | `{ "action": "trigger_cycle", "requested_by": string, "ts": iso8601 }` |
+| `flowwatch/{unit}/control/manual` | cloud → device | 1 | no | `{ "action": "activate"|"release", "requested_by": string, "ts": iso8601 }` |
 
 **Rule:** every payload carries its own `ts`. Don't rely on MQTT/broker receipt time — the device clock (NTP-synced on boot) is authoritative.
 
@@ -45,7 +45,7 @@ CREATE TABLE events (
 ## 4. Controlled vocabularies
 
 **`event_type` values** (MySQL `events.event_type` and used as prefixes in alert topics):
-`blockage_detected`, `cycle_complete`, `flood_alert`, `sms_sent`, `fault`, `wifi_lost`, `wifi_restored`, `manual_override_triggered`
+`blockage_detected`, `cycle_complete`, `flood_alert`, `sms_sent`, `fault`, `wifi_lost`, `wifi_restored`, `manual_mode_activated`, `manual_mode_released`
 
 **Fault `code` values** (`flowwatch/{unit}/alert/fault` payload and `events.detail`):
 `ACTUATOR_OVERCURRENT`, `LIMIT_SWITCH_TIMEOUT`, `CAMERA_UNAVAILABLE`, `SENSOR_OUT_OF_RANGE`

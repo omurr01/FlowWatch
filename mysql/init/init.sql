@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS events (
 --
 -- event_type values:
 --   blockage_detected, cycle_complete, flood_alert, sms_sent,
---   fault, wifi_lost, wifi_restored, manual_override_triggered
+--   fault, wifi_lost, wifi_restored, manual_mode_activated, manual_mode_released
 --
 -- fault code values (stored in 'detail' column):
 --   ACTUATOR_OVERCURRENT, LIMIT_SWITCH_TIMEOUT,

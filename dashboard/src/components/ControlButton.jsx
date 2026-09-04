@@ -1,4 +1,4 @@
-// ControlButton — publishes control/override to the broker.
+// ControlButton — publishes control/manual to the broker.
 // DESIGN.md §3: must disable the instant a cycle starts, re-enable only on STANDBY.
 // Never allows queuing a second command mid-cycle — firmware doesn't support it.
 // RULES.md §1: receives publish callback as prop, never calls mqtt.js directly.
@@ -17,9 +17,9 @@ export default function ControlButton({ unit, isCycling, actuatorState, publish 
 
   function handleClick() {
     if (disabled) return
-    // SCHEMA.md §1: control/override payload
-    publish(TOPICS.controlOverride(unit), {
-      action:       'trigger_cycle',
+    // SCHEMA.md §1: control/manual payload
+    publish(TOPICS.controlManual(unit), {
+      action:       'activate',
       requested_by: 'dashboard',
       ts:           new Date().toISOString(),
     })
@@ -37,7 +37,7 @@ export default function ControlButton({ unit, isCycling, actuatorState, publish 
   } else {
     label  = 'Trigger Cycle'
     tone   = 'ok'
-    detail = 'Manual override'
+    detail = 'Manual mode'
   }
 
   const bg     = disabled ? TOKENS.surface  : TOKENS[tone]

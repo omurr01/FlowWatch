@@ -26,7 +26,7 @@ Typography: system UI stack (`Inter`/`Segoe UI`/system-ui). This is an operator 
 |---|---|---|
 | `MetricCard` | any sensor topic | ok / warn / danger, driven by threshold comparison, never hardcoded per-instance |
 | `LiveChart` | `waterlevel` history | rolling window, no state — pure display |
-| `ControlButton` | publishes `control/override` | idle / disabled-while-cycling — never allow a second command mid-cycle |
+| `ControlButton` | publishes `control/manual` | idle / disabled-while-cycling — never allow a second command mid-cycle |
 | `ConnectivityBadge` | `status/connectivity` | connected / gsm-fallback |
 | `EventLog` | MySQL events via Node-RED endpoint | ok / warn / danger row tone, matches `event_type` (SCHEMA.md §4) |
 

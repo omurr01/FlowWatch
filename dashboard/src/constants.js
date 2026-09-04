@@ -16,7 +16,7 @@ export const TOPICS = {
   alertBlockage:    (unit) => topic(unit, 'alert/blockage'),
   alertFlood:       (unit) => topic(unit, 'alert/flood'),
   alertFault:       (unit) => topic(unit, 'alert/fault'),
-  controlOverride:  (unit) => topic(unit, 'control/override'),
+  controlManual:    (unit) => topic(unit, 'control/manual'),
   // Wildcard for subscribing to all unit topics
   allUnit:          (unit) => topic(unit, '#'),
 }
@@ -58,7 +58,8 @@ export const EVENT_TYPES = {
   FAULT:                    'fault',
   WIFI_LOST:                'wifi_lost',
   WIFI_RESTORED:            'wifi_restored',
-  MANUAL_OVERRIDE_TRIGGERED:'manual_override_triggered',
+  MANUAL_MODE_ACTIVATED:    'manual_mode_activated',
+  MANUAL_MODE_RELEASED:     'manual_mode_released',
 }
 
 // Severity mapping for EventLog row tones (DESIGN.md §2)
@@ -70,7 +71,8 @@ export const EVENT_SEVERITY = {
   [EVENT_TYPES.FAULT]:                     'danger',
   [EVENT_TYPES.WIFI_LOST]:                 'danger',
   [EVENT_TYPES.WIFI_RESTORED]:             'ok',
-  [EVENT_TYPES.MANUAL_OVERRIDE_TRIGGERED]: 'warn',
+  [EVENT_TYPES.MANUAL_MODE_ACTIVATED]:     'warn',
+  [EVENT_TYPES.MANUAL_MODE_RELEASED]:      'ok',
 }
 
 // ---------------------------------------------------------------------------

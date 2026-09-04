@@ -27,7 +27,7 @@
 **Tasks:**
 - Build `useFlowWatchFeed` hook (real MQTT-over-WebSocket, per `ARCHITECTURE.md` §2)
 - Build components per `DESIGN.md` §2, wired to real broker (mock publisher standing in for hardware)
-- Wire `ControlButton` to publish `control/override`
+- Wire `ControlButton` to publish `control/manual`
 **Exit criteria:** dashboard shows mock publisher's live values and a button click round-trips a message the mock subscriber can log.
 
 ## Sprint 3 — Firmware Core (bench only)
@@ -36,7 +36,7 @@
 **Tasks:**
 - Implement `sensors.cpp`, `mqtt_client.cpp`, `state_machine.cpp` per `RULES.md` §1/§4
 - Calibrate `BLOCKAGE_THRESHOLD_CM` / `FLOOD_THRESHOLD_CM` against bench sensor readings, update `SCHEMA.md` §5
-**Exit criteria:** ESP32 publishes real sensor data to the same dashboard built in Sprint 2, and responds to a remote override command by logging a state transition (actuators not yet attached).
+**Exit criteria:** ESP32 publishes real sensor data to the same dashboard built in Sprint 2, and responds to a remote manual-mode command by logging a state transition (actuators not yet attached).
 
 ## Sprint 4 — Hardware Integration
 **Goal:** physical removal cycle works end-to-end on the bench.

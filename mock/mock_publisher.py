@@ -90,9 +90,9 @@ def on_message(client, userdata, msg):
         payload = json.loads(msg.payload.decode())
         print(f"[{unit}] << CONTROL: {msg.topic} -> {payload}")
 
-        # Respond to override command — SCHEMA.md §1: control/override
-        if "override" in msg.topic and payload.get("action") == "trigger_cycle":
-            print(f"[{unit}] Manual override received — queueing cycle")
+        # Respond to manual mode command — SCHEMA.md §1: control/manual
+        if "manual" in msg.topic and payload.get("action") == "activate":
+            print(f"[{unit}] Manual mode activated — queueing cycle")
             userdata["force_cycle"] = True
     except Exception as e:
         print(f"[{unit}] Error parsing control message: {e}")
@@ -220,12 +220,12 @@ def main():
             elif water_level_cm <= FLOOD_THRESHOLD_CM - 1.0:
                 flood_active = False  # Hysteresis band
 
-            # ── Manual override — FR-6 ────────────────────────────────
+            # ── Manual mode — FR-6 ──────────────────────────────────
             if userdata["force_cycle"] and cycle_index == 0:
                 cycle_index = 1
                 cycle_tick = 0
                 userdata["force_cycle"] = False
-                print(f"[{unit}] -> Manual override: LIFTING")
+                print(f"[{unit}] -> Manual mode: LIFTING")
 
             # ── Actuator state machine — RULES.md §3 ──────────────────
             state = CYCLE_STATES[cycle_index]
